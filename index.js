@@ -66,7 +66,7 @@ app.use(cors());
 
 // In-memory cache
 const cache = {};
-const CACHE_DURATION = 10 * 60 * 1000; // 10 minutes
+const CACHE_DURATION = 5 * 60 * 1000; // minutes
 
 app.get('/api/stock-info/:ticker', async (req, res) => {
   const { ticker } = req.params;
