@@ -99,20 +99,32 @@ app.get('/api/stock-info/:ticker', async (req, res) => {
     //   if (isNaN(closingPrice)) closingPrice = null;
     // }
     // Try multiple selectors to handle PSX layout changes
-    let priceText =
-      $('div.quote__close').text().trim() ||
-      $('div.quote__price').text().trim() ||
-      $('span#quote-close').text().trim() ||
-      $('span.quote__value').text().trim() ||
-      $('div.quote span.value').first().text().trim();
+    // --- Improved robust price extraction ---
+  let priceText =
+    $('div.quote__close').text().trim() ||
+    $('div.quote__price').text().trim() ||
+    $('span#quote-close').text().trim() ||
+    $('span.quote__value').text().trim() ||
+    $('div.quote span.value').first().text().trim();
 
-    let closingPrice = null;
-    if (priceText) {
-      // Remove currency and commas
-      const numeric = priceText.replace(/[^0-9.]/g, "");
-      closingPrice = parseFloat(numeric);
-      if (isNaN(closingPrice)) closingPrice = null;
+  let closingPrice = null;
+
+  if (priceText) {
+    // Remove PKR, commas, non-breaking spaces, etc.
+    let numeric = priceText
+      .replace(/PKR/gi, "")
+      .replace(/[,\s\xa0]/g, "")
+      .trim();
+
+    // Now match digits properly
+    const match = numeric.match(/(\d+(\.\d+)?)/);
+    if (match) {
+      closingPrice = parseFloat(match[1]);
+    } else {
+      closingPrice = null;
     }
+  }
+
 
     let changePercent = $('div.change__percent').text().trim() || null;
     let changeValueText = $('div.change__value').text().trim() || null;
