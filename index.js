@@ -53,11 +53,112 @@
 //   console.log(`✅ Server running on port ${PORT}`);
 // });
 
-// index.js
-const express = require('express');
-const axios = require('axios');
-const cheerio = require('cheerio');
-const cors = require('cors');
+// // index.js
+// const express = require('express');
+// const axios = require('axios');
+// const cheerio = require('cheerio');
+// const cors = require('cors');
+
+// const app = express();
+// const PORT = process.env.PORT || 3001;
+
+// app.use(cors());
+
+// // In-memory cache
+// const cache = {};
+// const CACHE_DURATION = 5 * 60 * 1000; // minutes
+
+// app.get('/api/stock-info/:ticker', async (req, res) => {
+//   const { ticker } = req.params;
+//   const upperTicker = ticker.toUpperCase();
+
+//   // Return cached data if valid
+//   if (cache[upperTicker] && (Date.now() - cache[upperTicker].timestamp < CACHE_DURATION)) {
+//     return res.json(cache[upperTicker].data);
+//   }
+
+//   try {
+//     const url = `https://dps.psx.com.pk/company/${upperTicker}`;
+//     const response = await axios.get(url, {
+//       headers: {
+//         "User-Agent":
+//           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36",
+//       },
+//       timeout: 5000, // 5 seconds timeout
+//     });
+
+//     const $ = cheerio.load(response.data);
+
+//     const name = $('div.quote__name').text().trim() || null;
+//     const industry = $('div.quote__sector').text().trim() || null;
+
+//     // let priceText = $('div.quote__close').text().trim(); // e.g. "PKR 123.45"
+//     // let closingPrice = null;
+//     // if (priceText) {
+//     //   closingPrice = Number(priceText.replace(/[^0-9.]/g, ""));
+//     //   if (isNaN(closingPrice)) closingPrice = null;
+//     // }
+//     // Try multiple selectors to handle PSX layout changes
+//     // --- Improved robust price extraction ---
+//   let priceText =
+//     $('div.quote__close').text().trim() ||
+//     $('div.quote__price').text().trim() ||
+//     $('span#quote-close').text().trim() ||
+//     $('span.quote__value').text().trim() ||
+//     $('div.quote span.value').first().text().trim();
+
+//   let closingPrice = null;
+
+//   if (priceText) {
+//     // Remove PKR, commas, non-breaking spaces, etc.
+//     let numeric = priceText
+//       .replace(/PKR/gi, "")
+//       .replace(/[,\s\xa0]/g, "")
+//       .trim();
+
+//     // Now match digits properly
+//     const match = numeric.match(/(\d+(\.\d+)?)/);
+//     if (match) {
+//       closingPrice = parseFloat(match[1]);
+//     } else {
+//       closingPrice = null;
+//     }
+//   }
+
+
+//     let changePercent = $('div.change__percent').text().trim() || null;
+//     let changeValueText = $('div.change__value').text().trim() || null;
+//     let changeValue = changeValueText ? Number(changeValueText.replace(/[^0-9.-]/g, "")) : null;
+
+//     const data = {
+//       ticker: upperTicker,
+//       name,
+//       industry,
+//       closingPrice,
+//       changePercent,
+//       changeValue,
+//       timestamp: new Date(),
+//     };
+
+//     // Cache the result
+//     cache[upperTicker] = { data, timestamp: Date.now() };
+
+//     res.json(data);
+//   } catch (err) {
+//     console.error(`Error fetching data for ${upperTicker}:`, err.message);
+//     res.status(500).json({ error: "Failed to fetch data", details: err.message });
+//   }
+// });
+
+// app.listen(PORT, () => {
+//   console.log(`✅ Server running on port ${PORT}`);
+// });
+
+
+const express = require("express");
+const axios = require("axios");
+const cheerio = require("cheerio");
+const cors = require("cors");
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -66,14 +167,17 @@ app.use(cors());
 
 // In-memory cache
 const cache = {};
-const CACHE_DURATION = 5 * 60 * 1000; // minutes
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
-app.get('/api/stock-info/:ticker', async (req, res) => {
+app.get("/api/stock-info/:ticker", async (req, res) => {
   const { ticker } = req.params;
   const upperTicker = ticker.toUpperCase();
 
   // Return cached data if valid
-  if (cache[upperTicker] && (Date.now() - cache[upperTicker].timestamp < CACHE_DURATION)) {
+  if (
+    cache[upperTicker] &&
+    Date.now() - cache[upperTicker].timestamp < CACHE_DURATION
+  ) {
     return res.json(cache[upperTicker].data);
   }
 
@@ -84,52 +188,60 @@ app.get('/api/stock-info/:ticker', async (req, res) => {
         "User-Agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36",
       },
-      timeout: 5000, // 5 seconds timeout
+      timeout: 5000,
     });
 
     const $ = cheerio.load(response.data);
 
-    const name = $('div.quote__name').text().trim() || null;
-    const industry = $('div.quote__sector').text().trim() || null;
+    // -------------------------------
+    // ✅ BASIC INFO (unchanged)
+    // -------------------------------
+    const name = $("div.quote__name").text().trim() || null;
+    const industry = $("div.quote__sector").text().trim() || null;
 
-    // let priceText = $('div.quote__close').text().trim(); // e.g. "PKR 123.45"
-    // let closingPrice = null;
-    // if (priceText) {
-    //   closingPrice = Number(priceText.replace(/[^0-9.]/g, ""));
-    //   if (isNaN(closingPrice)) closingPrice = null;
-    // }
-    // Try multiple selectors to handle PSX layout changes
-    // --- Improved robust price extraction ---
-  let priceText =
-    $('div.quote__close').text().trim() ||
-    $('div.quote__price').text().trim() ||
-    $('span#quote-close').text().trim() ||
-    $('span.quote__value').text().trim() ||
-    $('div.quote span.value').first().text().trim();
+    let priceText =
+      $("div.quote__close").text().trim() ||
+      $("div.quote__price").text().trim() ||
+      $("span#quote-close").text().trim() ||
+      $("span.quote__value").text().trim() ||
+      $("div.quote span.value").first().text().trim();
 
-  let closingPrice = null;
-
-  if (priceText) {
-    // Remove PKR, commas, non-breaking spaces, etc.
-    let numeric = priceText
-      .replace(/PKR/gi, "")
-      .replace(/[,\s\xa0]/g, "")
-      .trim();
-
-    // Now match digits properly
-    const match = numeric.match(/(\d+(\.\d+)?)/);
-    if (match) {
-      closingPrice = parseFloat(match[1]);
-    } else {
-      closingPrice = null;
+    let closingPrice = null;
+    if (priceText) {
+      let numeric = priceText
+        .replace(/PKR/gi, "")
+        .replace(/[,\s\xa0]/g, "")
+        .trim();
+      const match = numeric.match(/(\d+(\.\d+)?)/);
+      closingPrice = match ? parseFloat(match[1]) : null;
     }
-  }
 
+    let changePercent = $("div.change__percent").text().trim() || null;
+    let changeValueText = $("div.change__value").text().trim() || null;
+    let changeValue = changeValueText
+      ? Number(changeValueText.replace(/[^0-9.-]/g, ""))
+      : null;
 
-    let changePercent = $('div.change__percent').text().trim() || null;
-    let changeValueText = $('div.change__value').text().trim() || null;
-    let changeValue = changeValueText ? Number(changeValueText.replace(/[^0-9.-]/g, "")) : null;
+    // -------------------------------
+    // ✅ EXTENDED INFO (newly added)
+    // -------------------------------
+    const extractValue = (label) => {
+      const el = $(`td:contains('${label}')`).next("td").text().trim();
+      return el || null;
+    };
 
+    const marketCap = extractValue("Market Capitalization");
+    const volume = extractValue("Volume");
+    const eps = extractValue("EPS");
+    const peRatio = extractValue("P/E Ratio");
+    const bookValue = extractValue("Book Value");
+    const high52Week = extractValue("52 Weeks High");
+    const low52Week = extractValue("52 Weeks Low");
+    const beta = extractValue("Beta");
+
+    // -------------------------------
+    // ✅ FINAL STRUCTURE
+    // -------------------------------
     const data = {
       ticker: upperTicker,
       name,
@@ -137,16 +249,27 @@ app.get('/api/stock-info/:ticker', async (req, res) => {
       closingPrice,
       changePercent,
       changeValue,
+      marketCap,
+      volume,
+      eps,
+      peRatio,
+      bookValue,
+      high52Week,
+      low52Week,
+      beta,
       timestamp: new Date(),
     };
 
-    // Cache the result
+    // Cache result
     cache[upperTicker] = { data, timestamp: Date.now() };
 
     res.json(data);
   } catch (err) {
-    console.error(`Error fetching data for ${upperTicker}:`, err.message);
-    res.status(500).json({ error: "Failed to fetch data", details: err.message });
+    console.error(`Error fetching data for ${ticker}:`, err.message);
+    res.status(500).json({
+      error: "Failed to fetch data",
+      details: err.message,
+    });
   }
 });
 
