@@ -92,10 +92,25 @@ app.get('/api/stock-info/:ticker', async (req, res) => {
     const name = $('div.quote__name').text().trim() || null;
     const industry = $('div.quote__sector').text().trim() || null;
 
-    let priceText = $('div.quote__close').text().trim(); // e.g. "PKR 123.45"
+    // let priceText = $('div.quote__close').text().trim(); // e.g. "PKR 123.45"
+    // let closingPrice = null;
+    // if (priceText) {
+    //   closingPrice = Number(priceText.replace(/[^0-9.]/g, ""));
+    //   if (isNaN(closingPrice)) closingPrice = null;
+    // }
+    // Try multiple selectors to handle PSX layout changes
+    let priceText =
+      $('div.quote__close').text().trim() ||
+      $('div.quote__price').text().trim() ||
+      $('span#quote-close').text().trim() ||
+      $('span.quote__value').text().trim() ||
+      $('div.quote span.value').first().text().trim();
+
     let closingPrice = null;
     if (priceText) {
-      closingPrice = Number(priceText.replace(/[^0-9.]/g, ""));
+      // Remove currency and commas
+      const numeric = priceText.replace(/[^0-9.]/g, "");
+      closingPrice = parseFloat(numeric);
       if (isNaN(closingPrice)) closingPrice = null;
     }
 
