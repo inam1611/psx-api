@@ -155,6 +155,7 @@
 // });
 
 
+// index.js
 const express = require("express");
 const axios = require("axios");
 const cheerio = require("cheerio");
@@ -165,15 +166,20 @@ const PORT = process.env.PORT || 3001;
 
 app.use(cors());
 
+// -------------------------------
 // In-memory cache
+// -------------------------------
 const cache = {};
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
+// -------------------------------
+// Main API Route
+// -------------------------------
 app.get("/api/stock-info/:ticker", async (req, res) => {
   const { ticker } = req.params;
   const upperTicker = ticker.toUpperCase();
 
-  // Return cached data if valid
+  // ✅ Return cached data if still valid
   if (
     cache[upperTicker] &&
     Date.now() - cache[upperTicker].timestamp < CACHE_DURATION
@@ -194,11 +200,14 @@ app.get("/api/stock-info/:ticker", async (req, res) => {
     const $ = cheerio.load(response.data);
 
     // -------------------------------
-    // ✅ BASIC INFO (unchanged)
+    // ✅ Basic Info
     // -------------------------------
     const name = $("div.quote__name").text().trim() || null;
     const industry = $("div.quote__sector").text().trim() || null;
 
+    // -------------------------------
+    // ✅ Price Extraction (robust)
+    // -------------------------------
     let priceText =
       $("div.quote__close").text().trim() ||
       $("div.quote__price").text().trim() ||
@@ -212,10 +221,14 @@ app.get("/api/stock-info/:ticker", async (req, res) => {
         .replace(/PKR/gi, "")
         .replace(/[,\s\xa0]/g, "")
         .trim();
+
       const match = numeric.match(/(\d+(\.\d+)?)/);
       closingPrice = match ? parseFloat(match[1]) : null;
     }
 
+    // -------------------------------
+    // ✅ Change Info
+    // -------------------------------
     let changePercent = $("div.change__percent").text().trim() || null;
     let changeValueText = $("div.change__value").text().trim() || null;
     let changeValue = changeValueText
@@ -223,24 +236,53 @@ app.get("/api/stock-info/:ticker", async (req, res) => {
       : null;
 
     // -------------------------------
-    // ✅ EXTENDED INFO (newly added)
+    // ✅ Helper: Extract clean table value by label
     // -------------------------------
-    const extractValue = (label) => {
-      const el = $(`td:contains('${label}')`).next("td").text().trim();
-      return el || null;
+    const extractValue = (labels = []) => {
+      let value = null;
+      for (const label of labels) {
+        const cell = $(`td:contains('${label}')`)
+          .filter(function () {
+            return $(this).text().trim().toLowerCase() === label.toLowerCase();
+          })
+          .next("td");
+
+        if (cell.length) {
+          const joined = cell
+            .find("*")
+            .addBack()
+            .contents()
+            .map(function () {
+              return $(this).text().trim();
+            })
+            .get()
+            .join(" ")
+            .replace(/\s+/g, " ")
+            .trim();
+
+          if (joined) {
+            value = joined;
+            break;
+          }
+        }
+      }
+      return value || null;
     };
 
-    const marketCap = extractValue("Market Capitalization");
-    const volume = extractValue("Volume");
-    const eps = extractValue("EPS");
-    const peRatio = extractValue("P/E Ratio");
-    const bookValue = extractValue("Book Value");
-    const high52Week = extractValue("52 Weeks High");
-    const low52Week = extractValue("52 Weeks Low");
-    const beta = extractValue("Beta");
+    // -------------------------------
+    // ✅ Extended info extraction
+    // -------------------------------
+    const marketCap = extractValue(["Market Cap", "Market Capitalization"]);
+    const volume = extractValue(["Volume", "Volume Traded"]);
+    const eps = extractValue(["EPS", "Earnings Per Share"]);
+    const peRatio = extractValue(["P/E Ratio", "PER", "Price to Earnings"]);
+    const bookValue = extractValue(["Book Value", "Book Value / Share"]);
+    const high52Week = extractValue(["52 Weeks High", "52 Week High"]);
+    const low52Week = extractValue(["52 Weeks Low", "52 Week Low"]);
+    const beta = extractValue(["Beta", "Beta Value"]);
 
     // -------------------------------
-    // ✅ FINAL STRUCTURE
+    // ✅ Combined Data Object
     // -------------------------------
     const data = {
       ticker: upperTicker,
@@ -260,19 +302,24 @@ app.get("/api/stock-info/:ticker", async (req, res) => {
       timestamp: new Date(),
     };
 
-    // Cache result
+    // -------------------------------
+    // ✅ Cache Result
+    // -------------------------------
     cache[upperTicker] = { data, timestamp: Date.now() };
 
+    // Send to client
     res.json(data);
   } catch (err) {
-    console.error(`Error fetching data for ${ticker}:`, err.message);
-    res.status(500).json({
-      error: "Failed to fetch data",
-      details: err.message,
-    });
+    console.error(`Error fetching data for ${upperTicker}:`, err.message);
+    res
+      .status(500)
+      .json({ error: "Failed to fetch data", details: err.message });
   }
 });
 
+// -------------------------------
+// Start Server
+// -------------------------------
 app.listen(PORT, () => {
   console.log(`✅ Server running on port ${PORT}`);
 });
